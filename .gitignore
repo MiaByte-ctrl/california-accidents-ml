@@ -1,0 +1,23 @@
+# Data (raw and processed)
+data/raw/
+data/processed/
+*.csv
+*.zip
+
+# Machine learning models
+models/
+*.pkl
+*.joblib
+*.h5
+
+# Python and Jupyter environment
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+.env
+venv/
+env/
+
+# System files
+.DS_Store
+Thumbs.db
