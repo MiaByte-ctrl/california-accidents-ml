@@ -15,7 +15,6 @@ An analytical and predictive modeling (Machine Learning) project aimed at analyz
 ├── data/                        — Raw and processed data (gitignored)
 ├── models/                      — Saved model artifacts (gitignored)
 ├── requirements.txt
-└── CLAUDE.md                    — Project context for Claude Code
 ```
 
 ## Key Results
