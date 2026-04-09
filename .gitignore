@@ -9,6 +9,8 @@ models/
 *.pkl
 *.joblib
 *.h5
+*.pt
+*.pth
 
 # Python and Jupyter environment
 __pycache__/
@@ -17,6 +19,10 @@ __pycache__/
 .env
 venv/
 env/
+
+# Local documentation and AI tooling
+docs/
+CLAUDE.md
 
 # System files
 .DS_Store
