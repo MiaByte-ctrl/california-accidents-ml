@@ -28,7 +28,7 @@ An analytical and predictive modeling (Machine Learning) project aimed at analyz
 
 ### 1. Clone the repository
 ```bash
-git clone [your_repo_link]
+git clone [https://github.com/MiaByte-ctrl/california-accidents-ml]
 cd california-accidents-ml
 ```
 
