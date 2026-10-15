@@ -94,3 +94,16 @@ def test_weather_priority_first_match_wins():
     result = aggregate_weather(weather)
     assert list(result[:3]) == ["Storm", "Snow_Ice", "Clear_or_Fair"]
     assert pd.isna(result[3])
+
+
+def test_class_weight_power_scales_between_none_and_balanced():
+    from src.models import class_weights_for
+    y = np.array([0] * 90 + [1] * 10)
+    assert np.allclose(class_weights_for(y, 0.0), 1.0)
+    full = class_weights_for(y, 1.0)
+    assert np.isclose(full[y == 1][0] / full[y == 0][0], 9.0)
+
+
+def test_three_class_mapping():
+    from src.evaluate import to_3_classes
+    assert list(to_3_classes(np.array([1, 2, 3, 4]))) == [0, 0, 1, 2]
