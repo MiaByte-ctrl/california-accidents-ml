@@ -14,3 +14,6 @@ jupyter
 # For GPU on Windows install manually from https://pytorch.org/get-started/locally/
 # Example CUDA 11.8: pip install torch --index-url https://download.pytorch.org/whl/cu118
 torch
+
+# Testy (python -m pytest tests)
+pytest
