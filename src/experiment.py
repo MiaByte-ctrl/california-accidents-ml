@@ -4,14 +4,20 @@ import os
 from src.data import PROJECT_DIR, load_clean, stratified_sample
 from src.evaluate import to_3_classes
 from src.features import add_features
-from src.split import cv_folds, load_split
+from src.split import SPLIT_PATH, assign_split, cv_folds, load_split, save_split
 
 RESULTS_DIR = os.path.join(PROJECT_DIR, "reports", "results")
 
 
 def load_all():
-    """Oczyszczone dane z cechami i kolumną 'split'."""
+    """Oczyszczone dane z cechami i kolumną 'split'.
+
+    Przy pierwszym uruchomieniu tworzy podział i zapisuje go do pliku; później
+    zawsze go wczytuje, żeby wszystkie notebooki używały tego samego podziału.
+    """
     df = add_features(load_clean())
+    if not os.path.exists(SPLIT_PATH):
+        save_split(df, assign_split(df))
     df["split"] = load_split(df)
     return df
 

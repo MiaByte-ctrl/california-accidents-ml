@@ -1,0 +1,18 @@
+{
+  "params": {
+    "weight_power": 0.5,
+    "subsample_freq": 1,
+    "subsample": 0.8,
+    "reg_lambda": 5.0,
+    "num_leaves": 127,
+    "n_estimators": 800,
+    "min_child_samples": 50,
+    "learning_rate": 0.05,
+    "colsample_bytree": 0.8
+  },
+  "scaling": [
+    1.0,
+    1.0,
+    1.0
+  ]
+}

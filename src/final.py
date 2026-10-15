@@ -2,15 +2,14 @@
 import itertools
 import os
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score
 
 from src.compare import parse_value
-from src.evaluate import (bootstrap_ci, compute_metrics, confusion_table, cross_validate,
-                          metrics_by_group, summarize, to_3_classes)
-from src.experiment import RESULTS_DIR, load_all
+from src.evaluate import (CLASS_NAMES_4, bootstrap_ci, compute_metrics, confusion_table,
+                          cross_validate, metrics_by_group, summarize)
+from src.experiment import RESULTS_DIR
 from src.models import fit_predict_lightgbm
 from src.split import cv_folds
 from src.data import PROJECT_DIR
@@ -115,6 +114,21 @@ def evaluate_on_test(model, scaling, test, y_test):
     return {
         "metrics": bootstrap_ci(y_test, y_pred),
         "by_source": metrics_by_group(y_test, y_pred, test["Source"].to_numpy()),
+        "by_year": metrics_by_group(y_test, y_pred, test["Year"].to_numpy()),
         "confusion": confusion_table(y_test, y_pred),
         "y_pred": y_pred,
     }
+
+
+def four_class_reference(train, tests, params):
+    """Wynik pomocniczy: ta sama konfiguracja wytrenowana na oryginalnych 4 klasach.
+
+    Służy tylko do porównania ze starą wersją projektu, nie do wyboru modelu.
+    tests: słownik {nazwa: DataFrame}. Zwraca tabelę metryk (wiersze = zbiory testowe).
+    """
+    model = fit_final_model(train, train["Severity"].to_numpy() - 1, params)
+    rows = {}
+    for name, test in tests.items():
+        rows[name] = compute_metrics(test["Severity"].to_numpy() - 1, model.predict(test),
+                                     CLASS_NAMES_4)
+    return pd.DataFrame(rows).T

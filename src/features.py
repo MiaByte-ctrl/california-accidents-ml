@@ -101,6 +101,20 @@ def cyclic_encode(X):
     return np.hstack([np.sin(angles), np.cos(angles)])
 
 
+def cyclic_feature_names(transformer, input_features):
+    """Nazwy kolumn zwracanych przez cyclic_encode (najpierw wszystkie sin, potem cos)."""
+    return [f"{col}_sin" for col in CYCLIC_COLS] + [f"{col}_cos" for col in CYCLIC_COLS]
+
+
+def original_feature(encoded_name):
+    """Nazwa cechy oryginalnej dla kolumny po preprocessingu, np. 'cat__County_Orange' -> 'County'."""
+    name = encoded_name.split("__", 1)[1]
+    for col in list(CYCLIC_COLS) + CATEGORICAL_COLS:
+        if name.startswith(col + "_"):
+            return col
+    return name
+
+
 def build_preprocessor(scale_numeric=True):
     """ColumnTransformer: imputacja, skalowanie i kodowanie dopasowywane na treningu.
 
@@ -120,6 +134,7 @@ def build_preprocessor(scale_numeric=True):
     return ColumnTransformer([
         ("num", make_pipeline(*numeric_steps), NUMERIC_COLS),
         ("bool", SimpleImputer(strategy="most_frequent"), BOOL_COLS),
-        ("cyc", FunctionTransformer(cyclic_encode), list(CYCLIC_COLS)),
+        ("cyc", FunctionTransformer(cyclic_encode, feature_names_out=cyclic_feature_names),
+         list(CYCLIC_COLS)),
         ("cat", categorical, CATEGORICAL_COLS),
     ])
