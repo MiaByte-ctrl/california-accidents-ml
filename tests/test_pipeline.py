@@ -1,4 +1,4 @@
-"""Testy chroniące przed wyciekiem danych. Uruchomienie: python -m pytest tests"""
+"""Tests that guard against data leakage. Run with: python -m pytest tests"""
 import numpy as np
 import pandas as pd
 
@@ -9,7 +9,7 @@ from src.preprocessing import FEATURES, build_preprocessor
 
 
 def make_fake_data(n=2000, seed=42):
-    """Mały sztuczny zbiór o tych samych kolumnach co dane z Kalifornii."""
+    """A small artificial dataset with the same columns as the California data."""
     rng = np.random.default_rng(seed)
     start = pd.Timestamp("2016-01-01") + pd.to_timedelta(rng.integers(0, 7 * 365, n), unit="D")
     df = pd.DataFrame({
@@ -37,7 +37,7 @@ def make_fake_data(n=2000, seed=42):
     for col in ["Amenity", "Bump", "Crossing", "Give_Way", "Junction", "No_Exit", "Railway",
                 "Roundabout", "Station", "Stop", "Traffic_Calming", "Traffic_Signal"]:
         df[col] = rng.random(n) < 0.1
-    # Duplikaty zdarzeń: kopiujemy 100 wierszy z nowym ID
+    # Duplicate events: copy 100 rows with a new ID
     dup = df.iloc[:100].copy()
     dup["ID"] = [f"D-{i}" for i in range(100)]
     return pd.concat([df, dup], ignore_index=True)
@@ -80,7 +80,7 @@ def test_imputer_uses_only_training_data():
     df = prepared_data()
     train = df[df["split"] == "train"].copy()
     test = df[df["split"] != "train"].copy()
-    # Celowo zmieniamy test: gdyby imputer go widział, mediana by się przesunęła
+    # Change the test set on purpose: if the imputer saw it, the median would shift
     test["Temperature(F)"] = 1000.0
     train.loc[train.index[:50], "Temperature(F)"] = np.nan
 

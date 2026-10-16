@@ -1,10 +1,10 @@
-"""Model finalny (notebook 03).
+"""Final model (notebook 03).
 
-Co tu jest:
-1. choose_lightgbm_config() — 3 najlepsze konfiguracje LightGBM z próbki sprawdzone na pełnym treningu.
-2. Zapis i odczyt parametrów modelu finalnego.
-3. evaluate_on_test() — jednorazowa ocena na zbiorze testowym.
-4. four_class_reference() — wynik pomocniczy dla oryginalnych 4 klas.
+What is here:
+1. choose_lightgbm_config() — the 3 best LightGBM configurations from the sample, checked on the full training set.
+2. Saving and loading the parameters of the final model.
+3. evaluate_on_test() — a single evaluation on a test set.
+4. four_class_reference() — reference result for the original 4 classes.
 """
 import json
 import os
@@ -21,13 +21,13 @@ FINAL_CONFIG_PATH = os.path.join(RESULTS_DIR, "final_config.json")
 
 
 # ---------------------------------------------------------------------------
-# 1. Wybór konfiguracji na pełnym zbiorze treningowym
+# 1. Choosing the configuration on the full training set
 # ---------------------------------------------------------------------------
 
 def choose_lightgbm_config(train, y, folds, n_configs=3):
-    """CV na pełnym train dla n najlepszych konfiguracji LightGBM ze strojenia na próbce.
+    """CV on the full train set for the n best LightGBM configurations from tuning on the sample.
 
-    Zwraca (tabela średnia ± SD, parametry najlepszej, jej metryki per fold, jej OOF).
+    Returns (mean ± SD table, parameters of the best one, its per-fold metrics, its OOF predictions).
     """
     candidates = load_configs("lightgbm")[:n_configs]
     configs = {f"config_{i + 1}": (fit_predict_lightgbm, params)
@@ -42,7 +42,7 @@ def choose_lightgbm_config(train, y, folds, n_configs=3):
 
 
 # ---------------------------------------------------------------------------
-# 2. Parametry modelu finalnego
+# 2. Parameters of the final model
 # ---------------------------------------------------------------------------
 
 def save_final_params(params):
@@ -56,13 +56,13 @@ def load_final_params():
 
 
 # ---------------------------------------------------------------------------
-# 3. Ocena na teście
+# 3. Evaluation on a test set
 # ---------------------------------------------------------------------------
 
 def evaluate_on_test(model, test, y_test):
-    """Jednorazowa ocena: metryki z przedziałem bootstrap, per źródło, per rok, macierz pomyłek.
+    """Single evaluation: metrics with bootstrap intervals, per source, per year, confusion matrix.
 
-    Model wybiera klasę o największym prawdopodobieństwie (model.predict).
+    The model picks the class with the highest probability (model.predict).
     """
     y_pred = model.predict(test)
     return {
@@ -75,14 +75,14 @@ def evaluate_on_test(model, test, y_test):
 
 
 # ---------------------------------------------------------------------------
-# 4. Wynik pomocniczy: 4 klasy
+# 4. Reference result: 4 classes
 # ---------------------------------------------------------------------------
 
 def four_class_reference(train, tests, params):
-    """Ta sama konfiguracja wytrenowana na oryginalnych 4 klasach.
+    """The same configuration trained on the original 4 classes.
 
-    Tylko do porównania ze starą wersją projektu, nie do wyboru modelu.
-    tests: słownik {nazwa: DataFrame}. Zwraca tabelę metryk (wiersz = zbiór testowy).
+    Only for comparison with the old version of the project, not for choosing the model.
+    tests: a dictionary {name: DataFrame}. Returns a metrics table (one row per test set).
     """
     model = fit_lightgbm(train, train["Severity"].to_numpy() - 1, params)
     rows = {}

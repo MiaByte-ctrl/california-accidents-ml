@@ -1,11 +1,11 @@
-"""Ocena modeli (notebooki 02–03).
+"""Model evaluation (notebooks 02–03).
 
-Co tu jest:
-1. compute_metrics() — wszystkie metryki dla jednego zestawu predykcji.
-2. cross_validate() — jeden model na wszystkich foldach.
-3. random_search() + zapis i odczyt wyników strojenia.
-4. compare_models() — kilka modeli na tych samych foldach; summarize() — średnia ± SD.
-5. Metryki osobno dla grup (np. źródeł), bootstrap i macierz pomyłek — do oceny na testach.
+What is here:
+1. compute_metrics() — all metrics for one set of predictions.
+2. cross_validate() — one model on all folds.
+3. random_search() + saving and loading the tuning results.
+4. compare_models() — several models on the same folds; summarize() — mean ± SD.
+5. Metrics per group (e.g. per source), bootstrap and confusion matrix — for the test sets.
 """
 import json
 import os
@@ -20,12 +20,12 @@ from sklearn.model_selection import ParameterSampler
 from src.data import CLASS_NAMES, RESULTS_DIR
 
 # ---------------------------------------------------------------------------
-# 1. Metryki
+# 1. Metrics
 # ---------------------------------------------------------------------------
 
 
 def compute_metrics(y_true, y_pred, class_names=CLASS_NAMES):
-    """macro-F1 (główna metryka), balanced accuracy, QWK i recall każdej klasy."""
+    """macro-F1 (main metric), balanced accuracy, QWK and the recall of each class."""
     labels = list(range(len(class_names)))
     result = {
         "macro_f1": f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0),
@@ -39,18 +39,18 @@ def compute_metrics(y_true, y_pred, class_names=CLASS_NAMES):
 
 
 # ---------------------------------------------------------------------------
-# 2. Walidacja krzyżowa
+# 2. Cross-validation
 # ---------------------------------------------------------------------------
 
 def cross_validate(fit_predict, df, y, folds, params=None):
-    """Uczy i ocenia model na każdym foldzie.
+    """Trains and evaluates a model on every fold.
 
-    fit_predict to jedna z funkcji z src/models.py. Preprocessing dzieje się
-    w jej środku, więc widzi tylko dane treningowe danego foldu.
+    fit_predict is one of the functions from src/models.py. Preprocessing happens
+    inside it, so it only sees the training data of the given fold.
 
-    Zwraca (tabela metryk: wiersz = fold, prawdopodobieństwa dla wszystkich wierszy df).
-    Prawdopodobieństwo dla wiersza pochodzi z modelu, który tego wiersza nie widział
-    (tzw. predykcje out-of-fold).
+    Returns (metrics table: one row per fold, probabilities for all rows of df).
+    The probability for a row comes from a model that did not see that row
+    (so-called out-of-fold predictions).
     """
     params = params or {}
     rows = []
@@ -69,16 +69,16 @@ def cross_validate(fit_predict, df, y, folds, params=None):
 
 
 # ---------------------------------------------------------------------------
-# 3. Strojenie hiperparametrów
+# 3. Hyperparameter tuning
 # ---------------------------------------------------------------------------
 
 def random_search(fit_predict, param_distributions, df, y, folds, n_iter=10, random_state=42):
-    """Losowe przeszukiwanie: n_iter losowych konfiguracji, każda oceniona w CV po macro-F1.
+    """Random search: n_iter random configurations, each scored by macro-F1 in CV.
 
-    Działa jak RandomizedSearchCV ze sklearn, ale przyjmuje dowolną funkcję fit_predict
-    (także sieć w PyTorch), więc wszystkie modele stroimy tak samo.
-    Zwraca tabelę konfiguracji posortowaną od najlepszej. Kolumna 'params' przechowuje
-    oryginalny słownik parametrów (w tabeli pandas zamieniłby np. max_depth=30 na 30.0).
+    Works like RandomizedSearchCV from sklearn, but accepts any fit_predict function
+    (including the PyTorch network), so all models are tuned the same way.
+    Returns a table of configurations sorted from best to worst. The 'params' column keeps
+    the original parameter dictionary (in a pandas table, e.g. max_depth=30 would become 30.0).
     """
     rows = []
     sampler = ParameterSampler(param_distributions, n_iter=n_iter, random_state=random_state)
@@ -96,16 +96,16 @@ def random_search(fit_predict, param_distributions, df, y, folds, n_iter=10, ran
 
 
 def save_search(name, table):
-    """Zapisuje wyniki strojenia: tabelę (CSV, do oglądania) i parametry (JSON, do wczytania)."""
+    """Saves the tuning results: the table (CSV, for viewing) and the parameters (JSON, for loading)."""
     table.drop(columns="params").to_csv(os.path.join(RESULTS_DIR, f"search_{name}.csv"), index=False)
-    configs = list(table["params"])  # od najlepszej do najgorszej
-    # default=float zamienia liczby numpy na zwykłe liczby, które JSON potrafi zapisać
+    configs = list(table["params"])  # from best to worst
+    # default=float turns numpy numbers into plain numbers that JSON can store
     with open(os.path.join(RESULTS_DIR, f"search_{name}.json"), "w") as f:
         json.dump(configs, f, indent=2, default=float)
 
 
 def load_configs(name):
-    """Konfiguracje modelu ze strojenia, od najlepszej. [{}] dla modelu bez strojenia."""
+    """A model's configurations from tuning, best first. [{}] for a model without tuning."""
     path = os.path.join(RESULTS_DIR, f"search_{name}.json")
     if not os.path.exists(path):
         return [{}]
@@ -114,17 +114,17 @@ def load_configs(name):
 
 
 # ---------------------------------------------------------------------------
-# 4. Porównanie modeli
+# 4. Model comparison
 # ---------------------------------------------------------------------------
 
 def compare_models(df, y, folds, configs):
-    """Kilka modeli na tych samych foldach.
+    """Several models on the same folds.
 
-    configs: słownik {nazwa: (funkcja fit_predict, parametry)}.
-    Zwraca:
-    - per_fold: metryki każdego modelu w każdym foldzie (kolumna 'model'),
-    - by_source: metryki każdego modelu osobno dla każdego źródła danych,
-    - oof: słownik {nazwa: prawdopodobieństwa out-of-fold}.
+    configs: a dictionary {name: (fit_predict function, parameters)}.
+    Returns:
+    - per_fold: the metrics of every model in every fold (column 'model'),
+    - by_source: the metrics of every model separately for each data source,
+    - oof: a dictionary {name: out-of-fold probabilities}.
     """
     per_fold, by_source, oof = [], [], {}
     for name, (fit_predict, params) in configs.items():
@@ -144,7 +144,7 @@ def compare_models(df, y, folds, configs):
 
 
 def summarize(per_fold):
-    """Średnia i odchylenie standardowe każdej metryki dla każdego modelu (jeden wiersz na model)."""
+    """Mean and standard deviation of every metric for every model (one row per model)."""
     metrics = [c for c in per_fold.columns if c not in ("model", "fold", "seconds")]
     grouped = per_fold.groupby("model", sort=False)
     table = grouped[metrics].mean().join(grouped[metrics].std().add_suffix("_std"))
@@ -153,11 +153,11 @@ def summarize(per_fold):
 
 
 # ---------------------------------------------------------------------------
-# 5. Ocena na testach
+# 5. Evaluation on the test sets
 # ---------------------------------------------------------------------------
 
 def metrics_by_group(y_true, y_pred, groups):
-    """Metryki osobno dla każdej wartości grupy (np. każdego źródła albo roku)."""
+    """Metrics separately for each value of a group (e.g. each source or year)."""
     rows = {}
     for value in sorted(pd.unique(groups)):
         mask = np.asarray(groups == value)
@@ -167,10 +167,10 @@ def metrics_by_group(y_true, y_pred, groups):
 
 
 def bootstrap_ci(y_true, y_pred, n_iterations=1000, random_state=42):
-    """95% przedział ufności bootstrap dla każdej metryki.
+    """95% bootstrap confidence interval for every metric.
 
-    1000 razy losujemy wiersze testu ze zwracaniem i liczymy metryki;
-    przedział to 2,5. i 97,5. percentyl otrzymanych wartości.
+    We draw the test rows with replacement 1000 times and compute the metrics;
+    the interval is the 2.5th and 97.5th percentile of the values obtained.
     """
     rng = np.random.default_rng(random_state)
     n = len(y_true)
@@ -187,7 +187,7 @@ def bootstrap_ci(y_true, y_pred, n_iterations=1000, random_state=42):
 
 
 def confusion_table(y_true, y_pred, class_names=CLASS_NAMES):
-    """Macierz pomyłek (wiersze = prawdziwa klasa, kolumny = przewidziana)."""
+    """Confusion matrix (rows = true class, columns = predicted class)."""
     labels = list(range(len(class_names)))
     matrix = confusion_matrix(y_true, y_pred, labels=labels)
     return pd.DataFrame(matrix, index=class_names, columns=class_names)

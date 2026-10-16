@@ -1,15 +1,15 @@
-"""Dane: wczytanie, czyszczenie, cechy i podział (notebook 01).
+"""Data: loading, cleaning, features and the train/test split (notebook 01).
 
-Co tu jest, w kolejności użycia:
-1. Ścieżki do plików i definicja zadania (3 klasy).
-2. Wczytanie i czyszczenie danych z Kalifornii.
-3. Cechy liczone wiersz po wierszu (czas, pogoda, wiatr, typ drogi).
-4. Podział na train / test_in / test_out, próbka 10% i foldy walidacji krzyżowej.
-5. load_all() — wszystko powyższe jednym wywołaniem.
+What is here, in the order it is used:
+1. File paths and the task definition (3 classes).
+2. Loading and cleaning the California data.
+3. Row-by-row features (time, weather, wind, road type).
+4. The train / test_in / test_out split, the 10% sample and the cross-validation folds.
+5. load_all() — everything above in one call.
 
-Zasada: w tym pliku NIE liczymy żadnych statystyk ze zbioru (median, kwantyli, mód).
-Wszystko, co zależy od wartości w danych, dzieje się w Pipeline (src/preprocessing.py),
-dopasowywanym tylko na zbiorze treningowym.
+Rule: this file does NOT compute any statistics from the data (medians, quantiles, modes).
+Everything that depends on values in the data happens in the Pipeline (src/preprocessing.py),
+which is fitted on the training data only.
 """
 import os
 
@@ -20,7 +20,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from src.preprocessing import BOOL_COLS
 
 # ---------------------------------------------------------------------------
-# 1. Ścieżki i definicja zadania
+# 1. Paths and task definition
 # ---------------------------------------------------------------------------
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,51 +30,52 @@ CLEAN_PATH = os.path.join(PROJECT_DIR, "data", "processed", "ca_clean_v2.pkl")
 SPLIT_PATH = os.path.join(PROJECT_DIR, "data", "processed", "split_v2.csv")
 RESULTS_DIR = os.path.join(PROJECT_DIR, "reports", "results")
 
-# Przewidujemy 3 uporządkowane klasy (Severity 1 i 2 połączone)
+# We predict 3 ordered classes (Severity 1 and 2 merged)
 CLASS_NAMES = ["Sev1-2", "Sev3", "Sev4"]
-CLASS_NAMES_4 = ["Sev1", "Sev2", "Sev3", "Sev4"]  # tylko do wyniku pomocniczego
+CLASS_NAMES_4 = ["Sev1", "Sev2", "Sev3", "Sev4"]  # only for the reference result
 
 
 def to_3_classes(severity):
-    """Severity 1–4 -> 0 (1 i 2), 1 (3), 2 (4)."""
+    """Severity 1–4 -> 0 (1 and 2), 1 (3), 2 (4)."""
     return np.select([severity <= 2, severity == 3], [0, 1], default=2)
 
 
 # ---------------------------------------------------------------------------
-# 2. Wczytanie i czyszczenie
+# 2. Loading and cleaning
 # ---------------------------------------------------------------------------
 
-# Kolumny wykluczone, bo zdradzają wynik (opisują skutek wypadku albo są znane po nim)
+# Columns excluded because they give away the answer (they describe the accident's
+# consequences or are only known after it)
 LEAKY_COLUMNS = [
-    "End_Time",       # znany dopiero po zakończeniu zdarzenia
-    "End_Lat",        # zasięg skutków; brak dla Source2/3, więc zdradza źródło
+    "End_Time",       # only known once the accident is over
+    "End_Lat",        # extent of the impact; missing for Source2/3, so it reveals the source
     "End_Lng",
-    "Distance(mi)",   # długość odcinka objętego skutkami = skutek opóźnienia
-    "Description",    # tekst opisuje skutek ("road closed", "stationary traffic")
+    "Distance(mi)",   # length of road affected = a consequence of the delay
+    "Description",    # the text describes the outcome ("road closed", "stationary traffic")
 ]
 
-# Kolumny bez informacji dla modelu: stałe w Kalifornii albo prawie całkowicie puste
+# Columns with no information for the model: constant in California or almost always empty
 USELESS_COLUMNS = [
     "State", "Country", "Timezone", "Turning_Loop",
     "Number", "Wind_Chill(F)", "Precipitation(in)",
     "Civil_Twilight", "Nautical_Twilight", "Astronomical_Twilight",
 ]
 
-# Stałe progi fizyczne (nie liczone z danych, więc nie powodują wycieku)
+# Fixed physical limits (not computed from the data, so they cannot leak)
 CLIPPING_RULES = {
     "Temperature(F)": (-20, 120),
     "Humidity(%)": (0, 100),
     "Visibility(mi)": (0, 10),
     "Wind_Speed(mph)": (0, 100),
-    "Pressure(in)": (20, 32),  # luźny zakres, bo stacje w górach mają niższe ciśnienie
+    "Pressure(in)": (20, 32),  # wide range, because mountain stations have lower pressure
 }
 
 
 def load_california():
-    """Zwraca surowe rekordy z Kalifornii.
+    """Returns the raw California records.
 
-    Jeśli istnieje data/processed/CA.csv (gotowy wycinek), czytamy go. W przeciwnym razie
-    filtrujemy plik surowy kawałkami, żeby nie trzymać w pamięci całych USA.
+    If data/processed/CA.csv (a ready-made extract) exists, it is read. Otherwise the raw file
+    is filtered in chunks, so the whole of the US is never held in memory.
     """
     if os.path.exists(CA_CSV_PATH):
         return pd.read_csv(CA_CSV_PATH)
@@ -86,16 +87,16 @@ def load_california():
 
 
 def clean(df):
-    """Czyszczenie wiersz po wierszu: typy, usunięcie kolumn, stałe progi, numer zdarzenia."""
+    """Row-by-row cleaning: types, dropped columns, fixed limits, event number."""
     df = df.copy()
 
-    # Czas startu jest potrzebny do cech i do podziału; wiersze bez niego usuwamy
+    # The start time is needed for features and for the split; rows without it are dropped
     df["Start_Time"] = pd.to_datetime(df["Start_Time"], format="mixed", errors="coerce")
     df = df.dropna(subset=["Start_Time"])
 
-    # Numer zdarzenia: ten sam czas i miejsce = ten sam wypadek zapisany kilka razy.
-    # Wiersze z tym samym numerem muszą trafić do tej samej części podziału.
-    # dropna=False, żeby wiersze z brakiem w kluczu też dostały numer.
+    # Event number: same time and place = the same accident recorded several times.
+    # Rows with the same number must end up in the same part of the split.
+    # dropna=False so that rows with a missing key value also get a number.
     df["event_id"] = df.groupby(["Start_Time", "Start_Lat", "Start_Lng"], dropna=False).ngroup()
 
     df = df.drop(columns=LEAKY_COLUMNS + USELESS_COLUMNS, errors="ignore")
@@ -107,7 +108,7 @@ def clean(df):
 
 
 def load_clean(use_cache=True):
-    """Wczytuje oczyszczone dane z pliku pośredniego albo tworzy je od nowa."""
+    """Reads the cleaned data from the intermediate file or creates it from scratch."""
     if use_cache and os.path.exists(CLEAN_PATH):
         return pd.read_pickle(CLEAN_PATH)
     df = clean(load_california())
@@ -116,10 +117,10 @@ def load_clean(use_cache=True):
 
 
 # ---------------------------------------------------------------------------
-# 3. Cechy wiersz po wierszu
+# 3. Row-by-row features
 # ---------------------------------------------------------------------------
 
-# Grupy pogody w kolejności PRIORYTETU: pierwsze dopasowanie wygrywa
+# Weather groups in order of PRIORITY: the first match wins
 WEATHER_GROUPS = [
     ("Storm", "thunder|t-storm|storm|hail|tornado|squall"),
     ("Snow_Ice", "snow|wintry|freezing|ice|sleet"),
@@ -141,19 +142,19 @@ WIND_DIRECTION_MAP = {
 
 
 def aggregate_weather(weather):
-    """Mapuje szczegółowy opis pogody na kilka grup (pierwsze dopasowanie wygrywa)."""
+    """Maps a detailed weather description to a few groups (the first match wins)."""
     text = weather.fillna("").str.lower()
     conditions = [text.str.contains(pattern) for _, pattern in WEATHER_GROUPS]
     names = [name for name, _ in WEATHER_GROUPS]
-    # np.select bierze pierwszy spełniony warunek z listy
+    # np.select takes the first condition in the list that is true
     result = pd.Series(np.select(conditions, names, default="Other"), index=weather.index)
-    # Brak opisu zostawiamy jako brak; uzupełni go imputer w Pipeline
+    # A missing description stays missing; the imputer in the Pipeline fills it in
     result[weather.isna()] = np.nan
     return result
 
 
 def classify_road(street):
-    """Typ drogi z nazwy ulicy (pierwsze dopasowanie wygrywa)."""
+    """Road type from the street name (the first match wins)."""
     upper = street.fillna("").str.upper()
     conditions = [
         upper.str.match(r"^I-\d+"),
@@ -166,12 +167,12 @@ def classify_road(street):
 
 
 def add_features(df):
-    """Dodaje cechy liczone wiersz po wierszu (bez statystyk z danych)."""
+    """Adds features computed row by row (no statistics from the data)."""
     df = df.copy()
     df["Hour"] = df["Start_Time"].dt.hour
     df["DayOfWeek"] = df["Start_Time"].dt.dayofweek
     df["Month"] = df["Start_Time"].dt.month
-    # Year służy tylko do podziału i analizy dryfu, nie jest cechą modelu
+    # Year is only used for the split and the drift analysis, it is not a model feature
     df["Year"] = df["Start_Time"].dt.year
 
     df["Weather_Aggregated"] = aggregate_weather(df["Weather_Condition"])
@@ -184,7 +185,7 @@ def add_features(df):
 
 
 # ---------------------------------------------------------------------------
-# 4. Podział, próbka i foldy
+# 4. Split, sample and folds
 # ---------------------------------------------------------------------------
 
 OUT_OF_TIME_START = pd.Timestamp("2022-01-01")
@@ -192,11 +193,11 @@ TEST_IN_FRACTION = 0.15
 
 
 def sample_events(df, fraction, random_state=42):
-    """Losuje część zdarzeń (event_id), osobno w każdej warstwie Severity × Source.
+    """Draws a fraction of the events (event_id), separately in each Severity × Source stratum.
 
-    Losujemy całe zdarzenia, żeby duplikaty jednego wypadku nie rozjechały się
-    między częściami. Losowanie w warstwach zachowuje proporcje klas i źródeł.
-    Zwraca tablicę wylosowanych numerów zdarzeń.
+    Whole events are drawn, so duplicate records of one accident never end up in different
+    parts. Drawing within strata keeps the class and source proportions.
+    Returns an array of the drawn event numbers.
     """
     rng = np.random.default_rng(random_state)
     events = df[["event_id", "Severity", "Source"]].drop_duplicates("event_id")
@@ -208,11 +209,11 @@ def sample_events(df, fraction, random_state=42):
 
 
 def assign_split(df, random_state=42):
-    """Etykieta części dla każdego wiersza: 'train', 'test_in' albo 'test_out'.
+    """Split label for every row: 'train', 'test_in' or 'test_out'.
 
-    - test_out: zdarzenia od 2022-01-01 (sprawdza, jak model radzi sobie w przyszłości),
-    - test_in:  losowe 15% zdarzeń z lat 2016–2021,
-    - train:    reszta lat 2016–2021.
+    - test_out: events from 2022-01-01 on (checks how the model copes with the future),
+    - test_in:  a random 15% of the events from 2016–2021,
+    - train:    the rest of 2016–2021.
     """
     split = pd.Series("train", index=df.index)
     split[df["Start_Time"] >= OUT_OF_TIME_START] = "test_out"
@@ -223,38 +224,38 @@ def assign_split(df, random_state=42):
 
 
 def save_split(df, split):
-    """Zapisuje przypisanie ID -> część, żeby każdy notebook używał tego samego podziału."""
+    """Saves the ID -> part assignment, so that every notebook uses the same split."""
     pd.DataFrame({"ID": df["ID"], "split": split}).to_csv(SPLIT_PATH, index=False)
 
 
 def load_split(df):
-    """Wczytuje zapisany podział i dopasowuje go do wierszy df po ID."""
+    """Reads the saved split and matches it to the rows of df by ID."""
     saved = pd.read_csv(SPLIT_PATH)
     return df["ID"].map(saved.set_index("ID")["split"])
 
 
 def stratified_sample(df, frac=0.1, random_state=42):
-    """Próbka ~10% zdarzeń do szybkiego porównywania modeli."""
+    """A ~10% sample of the events for quick model comparison."""
     chosen = sample_events(df, frac, random_state)
     return df[df["event_id"].isin(chosen)].reset_index(drop=True)
 
 
 def cv_folds(df, n_splits=5, random_state=42):
-    """Foldy walidacji krzyżowej: zdarzenie zawsze w jednym foldzie, proporcje Severity × Source zachowane."""
+    """Cross-validation folds: an event is always in one fold, Severity × Source proportions kept."""
     strata = df["Severity"].astype(str) + "_" + df["Source"].astype(str)
     cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     return list(cv.split(df, strata, groups=df["event_id"]))
 
 
 # ---------------------------------------------------------------------------
-# 5. Wszystko razem
+# 5. Everything together
 # ---------------------------------------------------------------------------
 
 def load_all():
-    """Oczyszczone dane z cechami i kolumną 'split'.
+    """Cleaned data with features and a 'split' column.
 
-    Przy pierwszym uruchomieniu tworzy podział i zapisuje go do pliku; później
-    zawsze go wczytuje, żeby wszystkie notebooki używały tego samego podziału.
+    On the first run it creates the split and saves it to a file; after that it always
+    reads it, so that every notebook uses the same split.
     """
     df = add_features(load_clean())
     if not os.path.exists(SPLIT_PATH):
@@ -264,7 +265,7 @@ def load_all():
 
 
 def prototype_data(n_splits=5):
-    """Próbka 10% zdarzeń z części train, etykiety 3-klasowe i foldy CV."""
+    """A 10% sample of the events from the train part, 3-class labels and CV folds."""
     df = load_all()
     train = df[df["split"] == "train"]
     sample = stratified_sample(train, frac=0.1, random_state=42)

@@ -1,9 +1,9 @@
-"""Proste wykresy do notebooków (matplotlib), w jednolitym stylu."""
+"""Simple charts for the notebooks (matplotlib), in one consistent style."""
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Paleta kategoryczna w stałej kolejności (pierwsze 3 sloty są czytelne także przy daltonizmie)
+# Categorical palette in a fixed order (the first 3 colours are also readable with colour blindness)
 SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]
 TEXT = "#0b0b0b"
 TEXT_MUTED = "#52514e"
@@ -11,7 +11,7 @@ GRID = "#e4e3df"
 
 
 def _style(ax):
-    """Wspólny, stonowany wygląd osi: bez ramki u góry/prawej, delikatna siatka."""
+    """Shared, muted look of the axes: no top/right frame, light grid."""
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color(GRID)
     ax.tick_params(colors=TEXT_MUTED)
@@ -20,7 +20,7 @@ def _style(ax):
 
 
 def share_by_year(df, value_col, value, group_col="Source", title=""):
-    """Linie: udział wierszy z value_col == value w każdym roku, osobno dla grup (np. źródeł)."""
+    """Lines: share of rows with value_col == value in each year, separately per group (e.g. source)."""
     table = (df[value_col] == value).groupby([df["Year"], df[group_col]]).mean().unstack()
     fig, ax = plt.subplots(figsize=(8, 4))
     for color, group in zip(SERIES_COLORS, table.columns):
@@ -33,14 +33,14 @@ def share_by_year(df, value_col, value, group_col="Source", title=""):
     ax.set_title(title, color=TEXT, loc="left")
     ax.legend(frameon=False)
     _style(ax)
-    ax.grid(axis="x", visible=False)  # tylko poziome linie siatki
+    ax.grid(axis="x", visible=False)  # horizontal grid lines only
     ax.grid(axis="y", color=GRID, linewidth=0.8)
     plt.tight_layout()
     return fig
 
 
 def metric_with_error(summary, metric="macro_f1", title=""):
-    """Poziome słupki: średnia metryki z CV ± odchylenie standardowe, posortowane."""
+    """Horizontal bars: mean of a metric from CV ± standard deviation, sorted."""
     data = summary.sort_values(metric)
     fig, ax = plt.subplots(figsize=(8, 0.5 * len(data) + 1))
     ax.barh(data["model"], data[metric], xerr=data[metric + "_std"], color=SERIES_COLORS[0],
@@ -55,7 +55,7 @@ def metric_with_error(summary, metric="macro_f1", title=""):
 
 
 def confusion_heatmap(confusion, title=""):
-    """Macierz pomyłek znormalizowana wierszami (= recall na przekątnej), z liczebnościami."""
+    """Confusion matrix normalised by row (= recall on the diagonal), with counts."""
     shares = confusion.div(confusion.sum(axis=1), axis=0)
     fig, ax = plt.subplots(figsize=(4.5, 4))
     ax.imshow(shares.to_numpy(), cmap="Blues", vmin=0, vmax=1)
@@ -74,14 +74,14 @@ def confusion_heatmap(confusion, title=""):
 
 
 def importance_by_class(table, top=12, title=""):
-    """Poziome słupki średniej |SHAP| dla najważniejszych cech, osobno dla każdej klasy."""
+    """Horizontal bars of mean |SHAP| for the most important features, separately for each class."""
     data = table.head(top).iloc[::-1]
     classes = [c for c in data.columns if c != "mean_all_classes"]
     y = np.arange(len(data))
     height = 0.8 / len(classes)
     fig, ax = plt.subplots(figsize=(8, 0.45 * len(data) + 1))
     for k, (color, cls) in enumerate(zip(SERIES_COLORS, classes)):
-        # pierwsza klasa na górze grupy, w tej samej kolejności co w legendzie
+        # first class at the top of each group, in the same order as in the legend
         ax.barh(y - k * height, data[cls], height=height * 0.9, color=color, label=cls)
     ax.set_yticks(y - height * (len(classes) - 1) / 2, data.index)
     ax.set_xlabel("mean |SHAP| (log-odds)", color=TEXT_MUTED)

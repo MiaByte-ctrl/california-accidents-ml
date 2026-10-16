@@ -1,12 +1,12 @@
-"""Modele i ich hiperparametry (notebooki 02–03).
+"""Models and their hyperparameters (notebooks 02–03).
 
-Co tu jest:
-1. Wagi klas — wspólne dla wszystkich modeli.
-2. Modele. Każdy ma tę samą postać:
-       fit_predict_<model>(df_train, y_train, df_val, params) -> prawdopodobieństwa klas
-   Preprocessing jest dopasowywany w środku, tylko na df_train.
-3. MODELS — słownik nazwa -> funkcja.
-4. SEARCH_SPACES — wartości hiperparametrów, które losujemy przy strojeniu.
+What is here:
+1. Class weights — shared by all models.
+2. Models. Each has the same form:
+       fit_predict_<model>(df_train, y_train, df_val, params) -> class probabilities
+   Preprocessing is fitted inside, on df_train only.
+3. MODELS — a dictionary name -> function.
+4. SEARCH_SPACES — the hyperparameter values drawn during tuning.
 """
 import numpy as np
 from lightgbm import LGBMClassifier
@@ -24,31 +24,31 @@ N_CLASSES = 3
 SEED = 42
 
 # ---------------------------------------------------------------------------
-# 1. Wagi klas
+# 1. Class weights
 # ---------------------------------------------------------------------------
 
 
 def class_weights_for(y, power):
-    """Waga każdego wiersza: zbalansowana waga jego klasy podniesiona do potęgi `power`.
+    """Weight of each row: the balanced weight of its class raised to the power `power`.
 
-    power = 1 -> pełne zbalansowanie (rzadkie klasy liczą się tyle co częste),
-    power = 0 -> brak ważenia, wartości pośrednie -> ważenie częściowe.
+    power = 1 -> fully balanced (rare classes count as much as common ones),
+    power = 0 -> no weighting, values in between -> partial weighting.
     """
     return compute_sample_weight("balanced", y) ** power
 
 
 def split_params(params):
-    """Oddziela weight_power (nasz parametr) od parametrów samego modelu."""
+    """Separates weight_power (our own parameter) from the parameters of the model itself."""
     params = dict(params)
     power = params.pop("weight_power", 1.0)
     return power, params
 
 
 def fit_with_weights(estimator, df_train, y_train, power, scale_numeric):
-    """Dopasowuje preprocessing i model na danych treningowych, z wagami klas.
+    """Fits the preprocessing and the model on the training data, with class weights.
 
-    Zwraca Pipeline (preprocessing + model), którego można używać do predykcji
-    na nowych danych i zapisać do pliku.
+    Returns a Pipeline (preprocessing + model) that can be used to predict on new data
+    and saved to a file.
     """
     preprocessor = build_preprocessor(scale_numeric=scale_numeric)
     X_train = preprocessor.fit_transform(df_train)
@@ -57,18 +57,18 @@ def fit_with_weights(estimator, df_train, y_train, power, scale_numeric):
 
 
 # ---------------------------------------------------------------------------
-# 2. Modele
+# 2. Models
 # ---------------------------------------------------------------------------
 
 def fit_predict_majority(df_train, y_train, df_val, params):
-    """Punkt odniesienia: zawsze klasa najczęstsza."""
+    """Baseline: always the most frequent class."""
     model = DummyClassifier(strategy="most_frequent")
     model.fit(df_train, y_train)
     return model.predict_proba(df_val)
 
 
 def fit_predict_logreg(df_train, y_train, df_val, params):
-    """Punkt odniesienia: regresja logistyczna z wagami klas."""
+    """Baseline: logistic regression with class weights."""
     power, params = split_params(params)
     estimator = LogisticRegression(max_iter=2000, random_state=SEED, **params)
     model = fit_with_weights(estimator, df_train, y_train, power, scale_numeric=True)
@@ -78,13 +78,13 @@ def fit_predict_logreg(df_train, y_train, df_val, params):
 def fit_predict_random_forest(df_train, y_train, df_val, params):
     power, params = split_params(params)
     estimator = RandomForestClassifier(n_jobs=-1, random_state=SEED, **params)
-    # Drzewa nie potrzebują skalowania cech
+    # Trees do not need feature scaling
     model = fit_with_weights(estimator, df_train, y_train, power, scale_numeric=False)
     return model.predict_proba(df_val)
 
 
 def fit_lightgbm(df_train, y_train, params):
-    """Dopasowany LightGBM (Pipeline). Używany też do modelu finalnego."""
+    """A fitted LightGBM (Pipeline). Also used for the final model."""
     power, params = split_params(params)
     estimator = LGBMClassifier(random_state=SEED, n_jobs=-1, verbose=-1, **params)
     return fit_with_weights(estimator, df_train, y_train, power, scale_numeric=False)
@@ -95,10 +95,10 @@ def fit_predict_lightgbm(df_train, y_train, df_val, params):
 
 
 def fit_predict_lightgbm_ordinal(df_train, y_train, df_val, params):
-    """Podejście porządkowe (Frank & Hall): dwa klasyfikatory „tak/nie”.
+    """Ordinal approach (Frank & Hall): two yes/no classifiers.
 
-    Model A uczy się P(y > 0), czyli „Sev3 lub Sev4”; model B uczy się P(y > 1), czyli „Sev4”.
-    Prawdopodobieństwa trzech klas składamy z różnic tych dwóch wartości.
+    Model A learns P(y > 0), i.e. "Sev3 or Sev4"; model B learns P(y > 1), i.e. "Sev4".
+    The probabilities of the three classes are built from the differences of these two values.
     """
     power, params = split_params(params)
     preprocessor = build_preprocessor(scale_numeric=False)
@@ -113,26 +113,26 @@ def fit_predict_lightgbm_ordinal(df_train, y_train, df_val, params):
         above.append(model.predict_proba(X_val)[:, 1])
 
     p_above_0 = above[0]
-    p_above_1 = np.minimum(above[1], p_above_0)  # P(y>1) nie może być większe niż P(y>0)
+    p_above_1 = np.minimum(above[1], p_above_0)  # P(y>1) cannot be larger than P(y>0)
     return np.column_stack([1 - p_above_0, p_above_0 - p_above_1, p_above_1])
 
 
-# --- Sieć neuronowa (PyTorch) ---
+# --- Neural network (PyTorch) ---
 
 NN_DEFAULTS = {
     "weight_power": 1.0,
-    "hidden": 128,         # liczba neuronów w pierwszej warstwie ukrytej
+    "hidden": 128,         # number of neurons in the first hidden layer
     "dropout": 0.3,
     "lr": 1e-3,            # learning rate
-    "weight_decay": 0.0,   # kara L2 na wagi
+    "weight_decay": 0.0,   # L2 penalty on the weights
     "batch_size": 1024,
     "max_epochs": 30,
 }
-PATIENCE = 3  # ile epok bez poprawy czekamy przed zatrzymaniem
+PATIENCE = 3  # how many epochs without improvement we wait before stopping
 
 
 def build_network(n_inputs, hidden, dropout):
-    """Sieć: dwie warstwy ukryte (hidden i hidden/2 neuronów) i warstwa wyjściowa na 3 klasy."""
+    """Network: two hidden layers (hidden and hidden/2 neurons) and an output layer for 3 classes."""
     import torch.nn as nn
     return nn.Sequential(
         nn.Linear(n_inputs, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Dropout(dropout),
@@ -142,29 +142,29 @@ def build_network(n_inputs, hidden, dropout):
 
 
 def train_with_early_stopping(network, loss_fn, X_fit, y_fit, X_stop, y_stop, p):
-    """Uczy sieć epokami; kończy, gdy strata na danych X_stop nie spada przez PATIENCE epok.
+    """Trains the network epoch by epoch; stops when the loss on X_stop has not fallen for PATIENCE epochs.
 
-    Na końcu przywraca wagi z najlepszej epoki.
+    At the end it restores the weights from the best epoch.
     """
     import torch
 
     optimizer = torch.optim.Adam(network.parameters(), lr=p["lr"], weight_decay=p["weight_decay"])
-    generator = torch.Generator().manual_seed(SEED)  # stała kolejność wierszy w epokach
+    generator = torch.Generator().manual_seed(SEED)  # fixed order of rows in the epochs
     best_loss, best_state, patience_left = np.inf, None, PATIENCE
 
     for epoch in range(p["max_epochs"]):
-        # Jedna epoka: przejście przez dane treningowe paczkami po batch_size wierszy
+        # One epoch: a pass over the training data in batches of batch_size rows
         network.train()
         order = torch.randperm(len(X_fit), generator=generator)
         for start in range(0, len(order), p["batch_size"]):
             batch = order[start:start + p["batch_size"]]
-            if len(batch) < 2:  # BatchNorm potrzebuje co najmniej 2 wierszy
+            if len(batch) < 2:  # BatchNorm needs at least 2 rows
                 continue
             optimizer.zero_grad()
             loss_fn(network(X_fit[batch]), y_fit[batch]).backward()
             optimizer.step()
 
-        # Sprawdzenie straty na danych do early stopping
+        # Check the loss on the early-stopping data
         network.eval()
         with torch.no_grad():
             stop_loss = loss_fn(network(X_stop), y_stop).item()
@@ -181,25 +181,25 @@ def train_with_early_stopping(network, loss_fn, X_fit, y_fit, X_stop, y_stop, p)
 
 
 def fit_predict_neural_net(df_train, y_train, df_val, params):
-    """Sieć MLP z ważoną funkcją straty i early stopping.
+    """MLP network with a weighted loss and early stopping.
 
-    Do early stopping używamy osobnych 10% zdarzeń z df_train — nigdy df_val,
-    bo df_val służy do oceny modelu.
+    Early stopping uses a separate 10% of the events from df_train — never df_val,
+    because df_val is used to evaluate the model.
     """
-    import torch  # ładowany tylko tutaj, bo jest duży i potrzebny tylko sieci
+    import torch  # only loaded here, because it is large and only the network needs it
 
     torch.manual_seed(SEED)
-    p = {**NN_DEFAULTS, **params}  # parametry domyślne nadpisane podanymi
+    p = {**NN_DEFAULTS, **params}  # default parameters overridden by the ones passed in
 
     preprocessor = build_preprocessor(scale_numeric=True)
     X_all = preprocessor.fit_transform(df_train).astype(np.float32)
     X_val = preprocessor.transform(df_val).astype(np.float32)
 
-    # Wydzielenie 10% zdarzeń do early stopping
+    # Set aside 10% of the events for early stopping
     inner = GroupShuffleSplit(n_splits=1, test_size=0.1, random_state=SEED)
     fit_idx, stop_idx = next(inner.split(X_all, y_train, groups=df_train["event_id"]))
 
-    # Te same wagi klas co w innych modelach: zbalansowane ** weight_power
+    # The same class weights as in the other models: balanced ** weight_power
     counts = np.bincount(y_train[fit_idx], minlength=N_CLASSES)
     class_weights = (len(fit_idx) / (N_CLASSES * np.maximum(counts, 1))) ** p["weight_power"]
     loss_fn = torch.nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32))
@@ -219,7 +219,7 @@ def fit_predict_neural_net(df_train, y_train, df_val, params):
 
 
 # ---------------------------------------------------------------------------
-# 3. Wszystkie modele
+# 3. All models
 # ---------------------------------------------------------------------------
 
 MODELS = {
@@ -232,10 +232,10 @@ MODELS = {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Hiperparametry do strojenia (po 10 losowań na model)
+# 4. Hyperparameters to tune (10 draws per model)
 # ---------------------------------------------------------------------------
 
-# Siła ważenia klas: ta sama siatka dla każdego modelu, żeby wszystkie traktować jednakowo
+# Strength of class weighting: the same grid for every model, so all are treated equally
 WEIGHT_POWERS = [0.0, 0.25, 0.5, 0.75, 1.0]
 
 LIGHTGBM_SPACE = {
@@ -252,7 +252,7 @@ LIGHTGBM_SPACE = {
 
 SEARCH_SPACES = {
     "logreg": {
-        "C": loguniform(1e-3, 10),  # losowane w skali logarytmicznej (0,001 … 10)
+        "C": loguniform(1e-3, 10),  # drawn on a log scale (0.001 … 10)
         "weight_power": WEIGHT_POWERS,
     },
     "random_forest": {
