@@ -23,3 +23,6 @@ env/
 # System files
 .DS_Store
 Thumbs.db
+
+# Small result tables (not data) must be versioned so notebooks can show them
+!reports/results/*.csv
