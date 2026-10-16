@@ -1,10 +1,10 @@
-"""Interpretacja modelu finalnego przez SHAP, z sumowaniem do cech oryginalnych."""
+"""Interpretacja modelu finalnego przez SHAP, z sumowaniem do cech oryginalnych (notebook 04)."""
 import numpy as np
 import pandas as pd
 import shap
 
-from src.evaluate import CLASS_NAMES
-from src.features import original_feature
+from src.data import CLASS_NAMES
+from src.preprocessing import original_feature
 
 
 def shap_values_by_feature(pipeline, df_sample):

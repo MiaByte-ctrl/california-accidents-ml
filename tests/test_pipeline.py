@@ -2,9 +2,10 @@
 import numpy as np
 import pandas as pd
 
-from src.data import LEAKY_COLUMNS, clean
-from src.features import FEATURES, add_features, aggregate_weather, build_preprocessor
-from src.split import assign_split, cv_folds
+from src.data import (LEAKY_COLUMNS, add_features, aggregate_weather, assign_split, clean,
+                      cv_folds, to_3_classes)
+from src.models import class_weights_for
+from src.preprocessing import FEATURES, build_preprocessor
 
 
 def make_fake_data(n=2000, seed=42):
@@ -97,7 +98,6 @@ def test_weather_priority_first_match_wins():
 
 
 def test_class_weight_power_scales_between_none_and_balanced():
-    from src.models import class_weights_for
     y = np.array([0] * 90 + [1] * 10)
     assert np.allclose(class_weights_for(y, 0.0), 1.0)
     full = class_weights_for(y, 1.0)
@@ -105,5 +105,4 @@ def test_class_weight_power_scales_between_none_and_balanced():
 
 
 def test_three_class_mapping():
-    from src.evaluate import to_3_classes
     assert list(to_3_classes(np.array([1, 2, 3, 4]))) == [0, 0, 1, 2]
