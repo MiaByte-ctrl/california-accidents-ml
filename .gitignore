@@ -5,12 +5,14 @@ data/processed/
 *.zip
 
 # Machine learning models
-models/
+models/*
 *.pkl
 *.joblib
 *.h5
 *.pt
 *.pth
+# ...except the final model, so notebook 04 works without retraining
+!models/lightgbm_final.joblib
 
 # Python and Jupyter environment
 __pycache__/

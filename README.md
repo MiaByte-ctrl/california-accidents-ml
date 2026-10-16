@@ -99,8 +99,8 @@ Download `US_Accidents_March23.csv` from
 the notebooks in order (`py -m jupyter notebook`).
 
 Notebooks 02 and 03 show saved results by default. To recalculate everything, set `RECOMPUTE = True`
-at the top (it takes about two hours). The trained model is not stored in the repository, so notebook 04
-needs notebook 03 to be run with `RECOMPUTE = True` first. On Windows with a GPU, install `torch` from the
+at the top (it takes about two hours). The trained model is included (`models/lightgbm_final.joblib`), so
+notebook 04 works without retraining. On Windows with a GPU, install `torch` from the
 [PyTorch website](https://pytorch.org/get-started/locally/) to get the GPU version.
 
 To run the checks: `python -m pytest tests`.
