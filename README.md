@@ -44,7 +44,8 @@ the same amount of tuning.
 (The first two were measured on a 10% sample of the training data, the rest on all of it.)
 
 LightGBM and Random Forest were close, but LightGBM came out ahead in every round of
-cross-validation, so I kept it. Random Forest is a reasonable alternative if catching the worst accidents matters more than
+cross-validation, so I kept it (to be fair, on the full data I checked three LightGBM settings and only
+the best one for the other models). Random Forest is a reasonable alternative if catching the worst accidents matters more than
 avoiding false alarms.
 
 The things the model relies on most are, in order: the data provider, the type of road (a highway or a
@@ -85,6 +86,8 @@ training.
 
 ## How to run it
 
+You need Python 3.11 or newer (the project was tested on 3.14).
+
 ```bash
 git clone https://github.com/MiaByte-ctrl/california-accidents-ml
 cd california-accidents-ml
@@ -96,7 +99,8 @@ Download `US_Accidents_March23.csv` from
 the notebooks in order (`py -m jupyter notebook`).
 
 Notebooks 02 and 03 show saved results by default. To recalculate everything, set `RECOMPUTE = True`
-at the top (it takes about two hours). On Windows with a GPU, install `torch` from the
+at the top (it takes about two hours). The trained model is not stored in the repository, so notebook 04
+needs notebook 03 to be run with `RECOMPUTE = True` first. On Windows with a GPU, install `torch` from the
 [PyTorch website](https://pytorch.org/get-started/locally/) to get the GPU version.
 
 To run the checks: `python -m pytest tests`.

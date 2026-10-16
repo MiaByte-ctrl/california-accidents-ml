@@ -241,7 +241,7 @@ def stratified_sample(df, frac=0.1, random_state=42):
 
 
 def cv_folds(df, n_splits=5, random_state=42):
-    """Cross-validation folds: an event is always in one fold, Severity × Source proportions kept."""
+    """Cross-validation folds: an event is always in one fold; class and source mix is kept."""
     strata = df["Severity"].astype(str) + "_" + df["Source"].astype(str)
     cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     return list(cv.split(df, strata, groups=df["event_id"]))

@@ -2,10 +2,13 @@
 import numpy as np
 import pandas as pd
 
+from sklearn.dummy import DummyClassifier
+
 from src.data import (LEAKY_COLUMNS, add_features, aggregate_weather, assign_split, clean,
                       cv_folds, to_3_classes)
-from src.models import class_weights_for
-from src.preprocessing import FEATURES, build_preprocessor
+from src.evaluation import compute_metrics, cross_validate_model
+from src.models import class_weights_for, fit_predict_lightgbm_ordinal, fit_with_weights
+from src.preprocessing import FEATURES
 
 
 def make_fake_data(n=2000, seed=42):
@@ -76,18 +79,38 @@ def test_cv_folds_do_not_share_events():
         assert not shared
 
 
-def test_imputer_uses_only_training_data():
+def test_preprocessing_learns_only_from_training_data():
     df = prepared_data()
     train = df[df["split"] == "train"].copy()
     test = df[df["split"] != "train"].copy()
-    # Change the test set on purpose: if the imputer saw it, the median would shift
-    test["Temperature(F)"] = 1000.0
     train.loc[train.index[:50], "Temperature(F)"] = np.nan
+    # Change the test set on purpose: if preprocessing saw it, the median would shift
+    test["Temperature(F)"] = 1000.0
+    y_train = to_3_classes(train["Severity"].to_numpy())
 
-    pre = build_preprocessor()
-    pre.fit(train[FEATURES])
-    learned_median = pre.named_transformers_["num"][0].statistics_[0]
+    # fit_with_weights is the function every model in the project uses for training
+    model = fit_with_weights(DummyClassifier(), train, y_train, power=1.0, scale_numeric=False)
+    model.predict(test)  # predicting must not refit anything
+    learned_median = model[0].named_transformers_["num"][0].statistics_[0]
     assert learned_median == train["Temperature(F)"].median()
+
+
+def test_cross_validation_trains_only_on_the_training_fold():
+    df = prepared_data()
+    train = df[df["split"] == "train"].reset_index(drop=True)
+    y = to_3_classes(train["Severity"].to_numpy())
+    folds = cv_folds(train, n_splits=3)
+    seen = []
+
+    def recording_model(df_train, y_train, df_val, params):
+        # Remembers which rows were used for training and returns dummy probabilities
+        seen.append((set(df_train.index), set(df_val.index)))
+        return np.full((len(df_val), 3), 1 / 3)
+
+    cross_validate_model(recording_model, train, y, folds)
+    for (train_rows, val_rows), (train_idx, val_idx) in zip(seen, folds):
+        assert train_rows == set(train_idx)
+        assert not train_rows & val_rows
 
 
 def test_weather_priority_first_match_wins():
@@ -106,3 +129,32 @@ def test_class_weight_power_scales_between_none_and_balanced():
 
 def test_three_class_mapping():
     assert list(to_3_classes(np.array([1, 2, 3, 4]))) == [0, 0, 1, 2]
+
+
+def test_metrics_match_hand_calculation():
+    y_true = np.array([0, 0, 0, 1, 1, 2])
+    y_pred = np.array([0, 0, 1, 1, 1, 0])
+    m = compute_metrics(y_true, y_pred)
+    # F1 per class: 2/3, 0.8 and 0 -> macro-F1 = 0.4889; recall: 2/3, 1, 0 -> mean 0.5556
+    assert np.isclose(m["macro_f1"], (2 / 3 + 0.8 + 0) / 3)
+    assert np.isclose(m["balanced_acc"], (2 / 3 + 1 + 0) / 3)
+    assert np.isclose(m["recall_Sev4"], 0.0)
+
+
+def test_class_missing_from_a_group_is_left_out():
+    # No Sev3 in this group: its recall must be missing, not 0, and not lower macro-F1
+    y_true = np.array([0, 0, 2, 2])
+    y_pred = np.array([0, 0, 2, 0])
+    m = compute_metrics(y_true, y_pred)
+    assert np.isnan(m["recall_Sev3"])
+    assert np.isclose(m["macro_f1"], (0.8 + 2 / 3) / 2)
+
+
+def test_ordinal_model_returns_valid_probabilities():
+    df = prepared_data()
+    train, val = df.iloc[:1500], df.iloc[1500:]
+    y_train = to_3_classes(train["Severity"].to_numpy())
+    proba = fit_predict_lightgbm_ordinal(train, y_train, val, {"n_estimators": 20})
+    assert proba.shape == (len(val), 3)
+    assert (proba >= 0).all()
+    assert np.allclose(proba.sum(axis=1), 1.0)

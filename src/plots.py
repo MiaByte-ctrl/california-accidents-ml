@@ -10,17 +10,21 @@ TEXT_MUTED = "#52514e"
 GRID = "#e4e3df"
 
 
-def _style(ax):
-    """Shared, muted look of the axes: no top/right frame, light grid."""
+def _style(ax, grid_axis):
+    """Shared, muted look of the axes: no top/right frame, light grid lines.
+
+    grid_axis="y" draws horizontal grid lines (for line charts),
+    grid_axis="x" draws vertical ones (for horizontal bar charts).
+    """
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color(GRID)
     ax.tick_params(colors=TEXT_MUTED)
-    ax.grid(axis="x" if ax.get_xlabel() == "" else "y", color=GRID, linewidth=0.8)
+    ax.grid(axis=grid_axis, color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
 
 
 def share_by_year(df, value_col, value, group_col="Source", title=""):
-    """Lines: share of rows with value_col == value in each year, separately per group (e.g. source)."""
+    """Lines: share of rows with value_col == value in each year, one line per group."""
     table = (df[value_col] == value).groupby([df["Year"], df[group_col]]).mean().unstack()
     fig, ax = plt.subplots(figsize=(8, 4))
     for color, group in zip(SERIES_COLORS, table.columns):
@@ -32,9 +36,7 @@ def share_by_year(df, value_col, value, group_col="Source", title=""):
     ax.set_ylabel("% of rows", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     ax.legend(frameon=False)
-    _style(ax)
-    ax.grid(axis="x", visible=False)  # horizontal grid lines only
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
+    _style(ax, grid_axis="y")
     plt.tight_layout()
     return fig
 
@@ -49,7 +51,7 @@ def metric_with_error(summary, metric="macro_f1", title=""):
         ax.text(value + 0.01, y, f"{value:.3f}", va="center", color=TEXT_MUTED, fontsize=9)
     ax.set_xlabel(f"{metric} (CV mean ± SD)", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
-    _style(ax)
+    _style(ax, grid_axis="x")
     plt.tight_layout()
     return fig
 
@@ -87,6 +89,6 @@ def importance_by_class(table, top=12, title=""):
     ax.set_xlabel("mean |SHAP| (log-odds)", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     ax.legend(frameon=False, loc="lower right")
-    _style(ax)
+    _style(ax, grid_axis="x")
     plt.tight_layout()
     return fig

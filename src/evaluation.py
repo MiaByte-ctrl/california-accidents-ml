@@ -2,7 +2,7 @@
 
 What is here:
 1. compute_metrics() — all metrics for one set of predictions.
-2. cross_validate() — one model on all folds.
+2. cross_validate_model() — one model on all folds.
 3. random_search() + saving and loading the tuning results.
 4. compare_models() — several models on the same folds; summarize() — mean ± SD.
 5. Metrics per group (e.g. per source), bootstrap and confusion matrix — for the test sets.
@@ -13,8 +13,7 @@ import time
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import (balanced_accuracy_score, cohen_kappa_score, confusion_matrix,
-                             f1_score, recall_score)
+from sklearn.metrics import cohen_kappa_score, confusion_matrix, f1_score, recall_score
 from sklearn.model_selection import ParameterSampler
 
 from src.data import CLASS_NAMES, RESULTS_DIR
@@ -25,16 +24,23 @@ from src.data import CLASS_NAMES, RESULTS_DIR
 
 
 def compute_metrics(y_true, y_pred, class_names=CLASS_NAMES):
-    """macro-F1 (main metric), balanced accuracy, QWK and the recall of each class."""
-    labels = list(range(len(class_names)))
+    """macro-F1 (main metric), balanced accuracy, QWK and the recall of each class.
+
+    A class that does not occur in y_true (possible in a small group, e.g. one data source
+    in one period) gets a missing recall (NaN) and is left out of macro-F1 and balanced
+    accuracy, instead of being counted as 0.
+    """
+    all_labels = list(range(len(class_names)))
+    present = [k for k in all_labels if np.any(y_true == k)]
+    recalls = recall_score(y_true, y_pred, labels=all_labels, average=None, zero_division=0)
     result = {
-        "macro_f1": f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0),
-        "balanced_acc": balanced_accuracy_score(y_true, y_pred),
+        "macro_f1": f1_score(y_true, y_pred, labels=present, average="macro", zero_division=0),
+        # balanced accuracy = mean recall over the classes that occur
+        "balanced_acc": np.mean([recalls[k] for k in present]),
         "qwk": cohen_kappa_score(y_true, y_pred, weights="quadratic"),
     }
-    recalls = recall_score(y_true, y_pred, labels=labels, average=None, zero_division=0)
-    for name, value in zip(class_names, recalls):
-        result[f"recall_{name}"] = value
+    for k, name in enumerate(class_names):
+        result[f"recall_{name}"] = recalls[k] if k in present else np.nan
     return result
 
 
@@ -42,7 +48,7 @@ def compute_metrics(y_true, y_pred, class_names=CLASS_NAMES):
 # 2. Cross-validation
 # ---------------------------------------------------------------------------
 
-def cross_validate(fit_predict, df, y, folds, params=None):
+def cross_validate_model(fit_predict, df, y, folds, params=None):
     """Trains and evaluates a model on every fold.
 
     fit_predict is one of the functions from src/models.py. Preprocessing happens
@@ -83,7 +89,7 @@ def random_search(fit_predict, param_distributions, df, y, folds, n_iter=10, ran
     rows = []
     sampler = ParameterSampler(param_distributions, n_iter=n_iter, random_state=random_state)
     for i, params in enumerate(sampler):
-        fold_table, _ = cross_validate(fit_predict, df, y, folds, params)
+        fold_table, _ = cross_validate_model(fit_predict, df, y, folds, params)
         row = dict(params)
         row["params"] = params
         row["macro_f1_mean"] = fold_table["macro_f1"].mean()
@@ -96,8 +102,9 @@ def random_search(fit_predict, param_distributions, df, y, folds, n_iter=10, ran
 
 
 def save_search(name, table):
-    """Saves the tuning results: the table (CSV, for viewing) and the parameters (JSON, for loading)."""
-    table.drop(columns="params").to_csv(os.path.join(RESULTS_DIR, f"search_{name}.csv"), index=False)
+    """Saves the tuning results: a table (CSV, to look at) and the parameters (JSON, to load)."""
+    csv_path = os.path.join(RESULTS_DIR, f"search_{name}.csv")
+    table.drop(columns="params").to_csv(csv_path, index=False)
     configs = list(table["params"])  # from best to worst
     # default=float turns numpy numbers into plain numbers that JSON can store
     with open(os.path.join(RESULTS_DIR, f"search_{name}.json"), "w") as f:
@@ -128,7 +135,7 @@ def compare_models(df, y, folds, configs):
     """
     per_fold, by_source, oof = [], [], {}
     for name, (fit_predict, params) in configs.items():
-        fold_table, proba = cross_validate(fit_predict, df, y, folds, params)
+        fold_table, proba = cross_validate_model(fit_predict, df, y, folds, params)
         fold_table.insert(0, "model", name)
         per_fold.append(fold_table)
 

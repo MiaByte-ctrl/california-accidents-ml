@@ -132,7 +132,7 @@ PATIENCE = 3  # how many epochs without improvement we wait before stopping
 
 
 def build_network(n_inputs, hidden, dropout):
-    """Network: two hidden layers (hidden and hidden/2 neurons) and an output layer for 3 classes."""
+    """Network: two hidden layers (hidden and hidden/2 neurons) and an output layer (3 classes)."""
     import torch.nn as nn
     return nn.Sequential(
         nn.Linear(n_inputs, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Dropout(dropout),
@@ -141,23 +141,26 @@ def build_network(n_inputs, hidden, dropout):
     )
 
 
-def train_with_early_stopping(network, loss_fn, X_fit, y_fit, X_stop, y_stop, p):
-    """Trains the network epoch by epoch; stops when the loss on X_stop has not fallen for PATIENCE epochs.
+def train_with_early_stopping(network, loss_fn, X_fit, y_fit, X_stop, y_stop, settings):
+    """Trains the network epoch by epoch.
+
+    Stops when the loss on X_stop has not fallen for PATIENCE epochs.
 
     At the end it restores the weights from the best epoch.
     """
     import torch
 
-    optimizer = torch.optim.Adam(network.parameters(), lr=p["lr"], weight_decay=p["weight_decay"])
+    optimizer = torch.optim.Adam(network.parameters(), lr=settings["lr"],
+                                 weight_decay=settings["weight_decay"])
     generator = torch.Generator().manual_seed(SEED)  # fixed order of rows in the epochs
     best_loss, best_state, patience_left = np.inf, None, PATIENCE
 
-    for epoch in range(p["max_epochs"]):
+    for epoch in range(settings["max_epochs"]):
         # One epoch: a pass over the training data in batches of batch_size rows
         network.train()
         order = torch.randperm(len(X_fit), generator=generator)
-        for start in range(0, len(order), p["batch_size"]):
-            batch = order[start:start + p["batch_size"]]
+        for start in range(0, len(order), settings["batch_size"]):
+            batch = order[start:start + settings["batch_size"]]
             if len(batch) < 2:  # BatchNorm needs at least 2 rows
                 continue
             optimizer.zero_grad()
@@ -189,7 +192,7 @@ def fit_predict_neural_net(df_train, y_train, df_val, params):
     import torch  # only loaded here, because it is large and only the network needs it
 
     torch.manual_seed(SEED)
-    p = {**NN_DEFAULTS, **params}  # default parameters overridden by the ones passed in
+    settings = {**NN_DEFAULTS, **params}  # default parameters overridden by the ones passed in
 
     preprocessor = build_preprocessor(scale_numeric=True)
     X_all = preprocessor.fit_transform(df_train).astype(np.float32)
@@ -201,15 +204,16 @@ def fit_predict_neural_net(df_train, y_train, df_val, params):
 
     # The same class weights as in the other models: balanced ** weight_power
     counts = np.bincount(y_train[fit_idx], minlength=N_CLASSES)
-    class_weights = (len(fit_idx) / (N_CLASSES * np.maximum(counts, 1))) ** p["weight_power"]
+    balanced = len(fit_idx) / (N_CLASSES * np.maximum(counts, 1))
+    class_weights = balanced ** settings["weight_power"]
     loss_fn = torch.nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32))
 
-    network = build_network(X_all.shape[1], p["hidden"], p["dropout"])
+    network = build_network(X_all.shape[1], settings["hidden"], settings["dropout"])
     network = train_with_early_stopping(
         network, loss_fn,
         torch.tensor(X_all[fit_idx]), torch.tensor(y_train[fit_idx], dtype=torch.long),
         torch.tensor(X_all[stop_idx]), torch.tensor(y_train[stop_idx], dtype=torch.long),
-        p,
+        settings,
     )
 
     network.eval()

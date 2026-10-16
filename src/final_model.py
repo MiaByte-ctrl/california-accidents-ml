@@ -1,7 +1,8 @@
 """Final model (notebook 03).
 
 What is here:
-1. choose_lightgbm_config() — the 3 best LightGBM configurations from the sample, checked on the full training set.
+1. choose_lightgbm_config() — the 3 best LightGBM configurations from the sample,
+   checked again on the full training set.
 2. Saving and loading the parameters of the final model.
 3. evaluate_on_test() — a single evaluation on a test set.
 4. four_class_reference() — reference result for the original 4 classes.
@@ -25,20 +26,30 @@ FINAL_CONFIG_PATH = os.path.join(RESULTS_DIR, "final_config.json")
 # ---------------------------------------------------------------------------
 
 def choose_lightgbm_config(train, y, folds, n_configs=3):
-    """CV on the full train set for the n best LightGBM configurations from tuning on the sample.
+    """CV on the full train set for the n best LightGBM configurations from the sample tuning.
 
-    Returns (mean ± SD table, parameters of the best one, its per-fold metrics, its OOF predictions).
+    Returns (table in the same format as the tuning results: parameters + macro-F1 mean and SD,
+    parameters of the best configuration, its per-fold metrics, its OOF predictions).
     """
     candidates = load_configs("lightgbm")[:n_configs]
     configs = {f"config_{i + 1}": (fit_predict_lightgbm, params)
                for i, params in enumerate(candidates)}
     per_fold, _, oof = compare_models(train, y, folds, configs)
 
-    table = summarize(per_fold)
-    best = table.loc[table["macro_f1"].idxmax(), "model"]
-    best_params = configs[best][1]
+    summary = summarize(per_fold).set_index("model")
+    rows = []
+    for name, (_, params) in configs.items():
+        row = dict(params)
+        row["macro_f1_mean"] = summary.loc[name, "macro_f1"]
+        row["macro_f1_std"] = summary.loc[name, "macro_f1_std"]
+        row["qwk_mean"] = summary.loc[name, "qwk"]
+        row["seconds"] = summary.loc[name, "seconds"]
+        rows.append(row)
+    table = pd.DataFrame(rows)
+
+    best = summary["macro_f1"].idxmax()
     best_per_fold = per_fold[per_fold["model"] == best].assign(model="lightgbm")
-    return table, best_params, best_per_fold, oof[best]
+    return table, configs[best][1], best_per_fold, oof[best]
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +71,10 @@ def load_final_params():
 # ---------------------------------------------------------------------------
 
 def evaluate_on_test(model, test, y_test):
-    """Single evaluation: metrics with bootstrap intervals, per source, per year, confusion matrix.
+    """Single evaluation of the final model on one test set.
+
+    Returns metrics with bootstrap intervals, metrics per source and per year, and the
+    confusion matrix.
 
     The model picks the class with the highest probability (model.predict).
     """
