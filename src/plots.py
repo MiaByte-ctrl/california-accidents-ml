@@ -29,7 +29,7 @@ def share_by_year(df, value_col, value, group_col="Source", title=""):
         last_year = table[group].last_valid_index()
         ax.annotate(group, (last_year, table.loc[last_year, group] * 100), xytext=(6, 0),
                     textcoords="offset points", color=TEXT_MUTED, va="center", fontsize=9)
-    ax.set_ylabel("% wierszy", color=TEXT_MUTED)
+    ax.set_ylabel("% of rows", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     ax.legend(frameon=False)
     _style(ax)
@@ -47,7 +47,7 @@ def metric_with_error(summary, metric="macro_f1", title=""):
             height=0.6, error_kw={"ecolor": TEXT_MUTED, "capsize": 3})
     for y, value in enumerate(data[metric]):
         ax.text(value + 0.01, y, f"{value:.3f}", va="center", color=TEXT_MUTED, fontsize=9)
-    ax.set_xlabel(f"{metric} (średnia z CV ± SD)", color=TEXT_MUTED)
+    ax.set_xlabel(f"{metric} (CV mean ± SD)", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     _style(ax)
     plt.tight_layout()
@@ -66,8 +66,8 @@ def confusion_heatmap(confusion, title=""):
                     ha="center", va="center", color=color, fontsize=8)
     ax.set_xticks(range(len(shares.columns)), shares.columns)
     ax.set_yticks(range(len(shares.index)), shares.index)
-    ax.set_xlabel("przewidziana", color=TEXT_MUTED)
-    ax.set_ylabel("prawdziwa", color=TEXT_MUTED)
+    ax.set_xlabel("predicted", color=TEXT_MUTED)
+    ax.set_ylabel("actual", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     plt.tight_layout()
     return fig
@@ -84,7 +84,7 @@ def importance_by_class(table, top=12, title=""):
         # pierwsza klasa na górze grupy, w tej samej kolejności co w legendzie
         ax.barh(y - k * height, data[cls], height=height * 0.9, color=color, label=cls)
     ax.set_yticks(y - height * (len(classes) - 1) / 2, data.index)
-    ax.set_xlabel("średnia |SHAP| (log-odds)", color=TEXT_MUTED)
+    ax.set_xlabel("mean |SHAP| (log-odds)", color=TEXT_MUTED)
     ax.set_title(title, color=TEXT, loc="left")
     ax.legend(frameon=False, loc="lower right")
     _style(ax)
