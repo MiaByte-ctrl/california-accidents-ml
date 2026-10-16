@@ -20,6 +20,11 @@ about 40% of them that. They also change their habits over the years. So a big p
 learns is simply *who reported the accident*, not what happened on the road. When the providers
 changed their habits in 2022, the model had no way to know.
 
+![Share of Severity 3 accidents per year, by data provider](reports/figures/sev3_share_by_source.png)
+
+*One provider stopped using Severity 3 almost entirely after 2020, while the other two kept using it
+for roughly 20–35% of their accidents.*
+
 So the model is useful for the period it knows, but I wouldn't trust it to predict the future without
 first checking how the data is being labeled.
 
@@ -61,6 +66,10 @@ back to it, I realised its results looked better than they really were, so I reb
   rare classes more often. Both are fixed.
 
 The old numbers can't be compared with the new ones, because of these problems.
+
+I rebuilt this version with the help of an AI coding assistant (Claude Code): I set the methodology
+rules and made the key decisions, while the assistant wrote most of the code and ran the experiments,
+which I then reviewed.
 
 ## If you want the details
 
