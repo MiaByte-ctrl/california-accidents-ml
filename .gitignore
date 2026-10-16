@@ -5,12 +5,14 @@ data/processed/
 *.zip
 
 # Machine learning models
-models/
+models/*
 *.pkl
 *.joblib
 *.h5
 *.pt
 *.pth
+# ...except the final model, so notebook 04 works without retraining
+!models/lightgbm_final.joblib
 
 # Python and Jupyter environment
 __pycache__/
@@ -23,3 +25,10 @@ env/
 # System files
 .DS_Store
 Thumbs.db
+
+# Small result tables (not data) must be versioned so notebooks can show them
+!reports/results/*.csv
+
+# Local-only folders (never pushed)
+_archiwum_lokalne/
+.pytest_cache/

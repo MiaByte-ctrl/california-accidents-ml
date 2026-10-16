@@ -1,0 +1,82 @@
+[
+  {
+    "weight_power": 0.5,
+    "weight_decay": 0.0001,
+    "lr": 0.001,
+    "hidden": 256,
+    "dropout": 0.1,
+    "batch_size": 1024
+  },
+  {
+    "weight_power": 0.5,
+    "weight_decay": 0.0,
+    "lr": 0.003,
+    "hidden": 256,
+    "dropout": 0.1,
+    "batch_size": 512
+  },
+  {
+    "weight_power": 0.5,
+    "weight_decay": 0.0001,
+    "lr": 0.003,
+    "hidden": 64,
+    "dropout": 0.1,
+    "batch_size": 1024
+  },
+  {
+    "weight_power": 0.75,
+    "weight_decay": 0.0001,
+    "lr": 0.003,
+    "hidden": 128,
+    "dropout": 0.2,
+    "batch_size": 1024
+  },
+  {
+    "weight_power": 0.75,
+    "weight_decay": 1e-05,
+    "lr": 0.003,
+    "hidden": 64,
+    "dropout": 0.2,
+    "batch_size": 1024
+  },
+  {
+    "weight_power": 0.75,
+    "weight_decay": 0.0001,
+    "lr": 0.001,
+    "hidden": 256,
+    "dropout": 0.1,
+    "batch_size": 512
+  },
+  {
+    "weight_power": 0.25,
+    "weight_decay": 0.0001,
+    "lr": 0.001,
+    "hidden": 256,
+    "dropout": 0.3,
+    "batch_size": 1024
+  },
+  {
+    "weight_power": 0.25,
+    "weight_decay": 0.0001,
+    "lr": 0.003,
+    "hidden": 256,
+    "dropout": 0.1,
+    "batch_size": 512
+  },
+  {
+    "weight_power": 1.0,
+    "weight_decay": 0.0,
+    "lr": 0.003,
+    "hidden": 128,
+    "dropout": 0.3,
+    "batch_size": 512
+  },
+  {
+    "weight_power": 1.0,
+    "weight_decay": 0.0,
+    "lr": 0.003,
+    "hidden": 64,
+    "dropout": 0.3,
+    "batch_size": 1024
+  }
+]

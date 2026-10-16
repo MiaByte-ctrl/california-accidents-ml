@@ -1,16 +1,25 @@
-pandas
-numpy
-matplotlib
-seaborn
-plotly
-scikit-learn
-scipy
-statsmodels
-joblib
-shap
-jupyter
+# Exact versions the project was run and tested with (Python 3.14).
+# pandas 3 needs Python 3.11 or newer.
 
-# PyTorch — CPU build (default).
-# For GPU on Windows install manually from https://pytorch.org/get-started/locally/
-# Example CUDA 11.8: pip install torch --index-url https://download.pytorch.org/whl/cu118
-torch
+pandas==3.0.6
+pyarrow==26.0.0
+numpy==2.5.4
+scipy==1.18.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+shap==0.53.0
+joblib==1.6.0
+matplotlib==3.11.2
+
+# PyTorch (neural network), CPU build by default.
+# For GPU on Windows install it from https://pytorch.org/get-started/locally/ instead,
+# choosing the CUDA version that matches your graphics card driver.
+torch==2.14.1
+
+# Running the notebooks
+jupyter
+ipykernel==7.4.0
+nbconvert==7.17.2
+
+# Tests (python -m pytest tests)
+pytest==9.1.1
