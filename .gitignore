@@ -26,3 +26,7 @@ Thumbs.db
 
 # Small result tables (not data) must be versioned so notebooks can show them
 !reports/results/*.csv
+
+# Local-only folders (never pushed)
+_archiwum_lokalne/
+.pytest_cache/
