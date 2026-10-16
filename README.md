@@ -34,7 +34,7 @@ An analytical and predictive modeling (Machine Learning) project aimed at analyz
 
 ## Key Results
 
-**Model comparison (5-fold grouped CV on a 10% sample of `train`, macro-F1 mean ± SD):**
+**Model comparison and tuning (5-fold grouped CV on a 10% sample of `train`, macro-F1 mean ± SD):**
 
 | Model | macro-F1 | QWK | Recall Sev4 |
 |---|---|---|---|
@@ -45,7 +45,15 @@ An analytical and predictive modeling (Machine Learning) project aimed at analyz
 | LightGBM | 0.640 ± 0.006 | 0.682 | 0.15 |
 | Random Forest | 0.642 ± 0.003 | 0.678 | 0.16 |
 
-RF and LightGBM are tied overall; LightGBM was chosen because it is better **within** each data source (e.g. `Source1`: 0.43 vs 0.39). On the full `train` set the selected LightGBM configuration reached macro-F1 **0.726 ± 0.006** in 5-fold CV.
+On the 10% sample RF and LightGBM were tied, so the three main models were re-run on the **full `train` set** (1.1M rows) with the same 5 folds:
+
+| Model (full `train`, 5-fold grouped CV) | macro-F1 | Balanced acc. | QWK | Recall Sev4 |
+|---|---|---|---|---|
+| **LightGBM** | **0.726 ± 0.006** | 0.723 | **0.757** | 0.34 |
+| Random Forest | 0.717 ± 0.003 | 0.740 | 0.740 | 0.40 |
+| Neural network | 0.617 ± 0.004 | 0.639 | 0.605 | 0.20 |
+
+LightGBM beats RF in **all 5 folds** (by 0.004–0.012 macro-F1 and ~0.017 QWK) and is clearly better within the largest data source (`Source1`: 0.51 vs 0.46), so it was kept as the final model. RF catches more Severity 4 cases at the cost of more false alarms. All models score much higher with 10× more data (e.g. LightGBM 0.64 → 0.73), so the sample-based table above underestimates absolute performance.
 
 **Final LightGBM, single evaluation on held-out data (95% bootstrap CI):**
 
